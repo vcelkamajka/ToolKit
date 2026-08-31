@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from rdkit import Chem, DataStructs
 from rdkit.Chem import Draw, AllChem
 from rdkit.Chem import Descriptors, rdFingerprintGenerator
-
+import py3Dmol
 
 class RDKitTools:
     def __init__(self,name,SMILES):
@@ -19,6 +19,38 @@ class RDKitTools:
         plt.yticks([])
         plt.title(self.name)
         plt.show()
+
+    def get_3d(self):
+
+        self.mol_3d = Chem.AddHs(self.molecule)
+
+        params = AllChem.ETKDGv3()
+        params.randomSeed = 42
+        params.numThreads = 0
+        conf_ids = AllChem.EmbedMultipleConfs(self.mol_3d, numConfs=20, params=params)
+
+        energies = []
+        if AllChem.MMFFHasAllMoleculeParams(self.mol_3d):
+            results = AllChem.MMFFOptimizeMoleculeConfs(self.mol_3d, maxIters=2000)
+            energies = [e for (converged, e) in results]
+        else:
+            results = AllChem.UFFOptimizeMoleculeConfs(self.mol_3d, maxIters=2000)
+            energies = [e for (converged, e) in results]
+
+        best_id = int(min(range(len(energies)), key=lambda i: energies[i]))
+        best_conf = self.mol_3d.GetConformer(conf_ids[best_id])
+
+        mol_best = Chem.Mol(self.mol_3d)
+        mol_best.RemoveAllConformers()
+        mol_best.AddConformer(best_conf, assignId=True)
+
+        view = py3Dmol.view(width=1200, height=1200)
+        view.addModel(Chem.MolToMolBlock(mol_best), self.name)
+        view.setStyle({'stick': {'scale': 1}, 'sphere': {'scale': 0.3}})
+        view.zoomTo()
+
+        with open('molecule_3d.html', 'w') as f:
+            f.write(view._make_html())
 
     def get_properties(self,additional_props=None):
         self.additional_props = additional_props
@@ -45,6 +77,7 @@ class RDKitTools:
         if self.additional_props is not None:
             for prop in self.additional_props:
                 property = Descriptors.CalcMolDescriptors(self.molecule)
+                # insane level of brain usage - calcmoldesc.. returns a dict, so use prop to get what you need :D
                 print(f'Computed {prop}: {property[prop]:.4f}')
             print('=' * 50)
 
@@ -82,7 +115,10 @@ class RDKitTools:
         print(self.all_similarity)
 
         print('=' * 50)
-      
+
+
+        #print(f'All of similarity index: {self.all_similarity}')
+        #print(f'Acceptable similarity index: {self.acceptable_similarity}')
 
     def search_tool(self,database,criteria_desc=None,criteria_desc_val=None, criteria_similarity=0):
         self.target_mol_fp = Chem.RDKFingerprint(self.molecule)
@@ -120,6 +156,7 @@ class RDKitTools:
                 full_prop_list.append([molecule,*comp_mol_props.values()])
 
             full_desc_df = pd.DataFrame(full_prop_list, columns=['SMILES', *comp_mol_props.keys()])
+            #full_desc_df.to_csv('AAtest.csv', index=False)
 
             selected_desc_df = full_desc_df[criteria_desc]
             selected_desc_df.to_csv('Full_Criteria_Data_Desc.csv', index=False)
@@ -127,6 +164,8 @@ class RDKitTools:
             criteria_desc.pop(0)
             # to remove SMILES from list
 
+            # criteria_met_df = pd.DataFrame(criteria_met_list, columns=['Molecule',f'{criteria_desc}'])
+            # print(criteria_met_df)
             print('=' * 50)
             print(f'PLEASE NOTE:\nTHE FILTERING VIA CRITERIA DESC AND VAL ASSUMES THAT YOU WANT TO FILTER IN THE ORDER GIVEN AND ALSO THAT YOU WISH TO FIND ALL VALUES THAT ARE >= THAN THE VAL INPUTTED!\nIF THIS IS NOT INTENDED, ONLY LOOK AT THE FIRST FILTERED DF AND SELECT MANUALLY!')
             print('='*50)
@@ -153,7 +192,7 @@ name = 'Caffeine'
 
 additional_props = ['MaxAbsPartialCharge', 'MinPartialCharge','NumValenceElectrons']
 mols_to_compare = {'Theobromine':'Cn1cnc2c1c(=O)[nH]c(=O)n2C','Theophylline': 'CN1C2=C(C(=O)N(C1=O)C)NC=N2'}
-#mols_to_compare = ['Cn1cnc2c1c(=O)[nH]c(=O)n2C','CN1C2=C(C(=O)N(C1=O)C)NC=N2'] # CAN ALSO JUST BE A SMILES LIST
+#mols_to_compare = ['Cn1cnc2c1c(=O)[nH]c(=O)n2C','CN1C2=C(C(=O)N(C1=O)C)NC=N2']
 threshold = 0.9
 
 # SMILES MUST BE LEFT IN THE DESC !!!
@@ -168,3 +207,9 @@ test.draw_mol()
 test.get_properties(additional_props)
 test.get_similarity(mols_to_compare,threshold=threshold)
 test.search_tool(database,criteria_desc, criteria_desc_val,criteria_similarity)
+
+# accepted_mols = test.acceptable_similarity
+# for mol in accepted_mols:
+#     print(f'Similarity: {mol[1]:.2f}')
+#     print(f'Molecule: {mol[0]}')
+
