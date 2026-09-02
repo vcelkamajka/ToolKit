@@ -1,4 +1,4 @@
-List of varied python programmes - used for menial / broad day-to-day work.
+List of varied python programmes - used for menial / broad day-to-day work. In the repository, .csv files are supplied which are used in the examples set out in each programme.
 
 **Colour Tools:** Used for getting the most common colour(s) from an image - useful for art or ensuring consistency. Also features a tool to make a colour spectrum starting from an rgb value.
 
