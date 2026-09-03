@@ -6,6 +6,7 @@ from sklearn.linear_model import LinearRegression
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = ["Times New Roman"]
+np.set_printoptions(legacy='1.25')
 
 def make_placeholder(n):
     var = 'Run ' + str(n+1)
@@ -26,89 +27,68 @@ class Calibration:
         self.dataframe = dataframe
 
         self.dataframe = pd.read_csv(dataframe)
-        self.run = self.dataframe.columns[0]
+
+        # where Run == 1 and Conc. == val -> get mean abs. and stdev
+
         self.x_col = self.dataframe.columns[1]
         self.y_col = self.dataframe.columns[2]
 
-        self.x_vals = self.dataframe[self.x_col]
-        self.y_vals = self.dataframe[self.y_col]
+        conc_range_list = []
+        conc_range_list.append(self.dataframe[self.x_col].unique())
+        # gets all the UNIQUE conc. values
 
-        self.dataframe.set_index(self.run, inplace=True)
+        res_list = []
+        # list in the format of : [ [mean_1, std_1], [mean_2, std_2], ... [...] ]
 
-        print(self.dataframe)
+        for n in range(len(conc_range_list[0])):
+            res = self.dataframe[self.dataframe[self.x_col] == conc_range_list[0][n]]
+            res = res[self.y_col]
 
-        no_of_runs = self.dataframe.index[-1]
-        self.run_list = []
+            res_mean = get_mean(res)
+            res_std = get_std(res)
 
-        for n in range(no_of_runs + 1):
-            new_var = make_placeholder(n)
-            self.run_list.append(new_var)
+            res_list.append([res_mean, res_std])
 
-        count = 0
-        y_std_list = []
-        y_mean_list = []
-        x_std_list = []
-        x_mean_list = []
-        for run in self.run_list:
-            run = self.dataframe[self.dataframe[self.x_col] == self.x_vals[count]]
-            run_x_only = run[self.x_col]
-            run_y_only = run[self.y_col]
-            count += 1
+        len_runs = len(res_list)
 
-            x_std_list.append(get_std(run_x_only))
-            x_mean_list.append(get_mean(run_x_only))
+        mean_col = f'{self.y_col} Mean'
+        std_col = f'{self.y_col} Stdev (Sample)'
 
-            y_std_list.append(get_std(run_y_only))
-            y_mean_list.append(get_mean(run_y_only))
+        res_df = pd.DataFrame(res_list, columns=[mean_col, std_col])
 
-        stats_df = pd.DataFrame()
-        stats_df['Run No.'] = self.run_list
-        stats_df[f'{self.y_col} stdev (sample)'] = y_std_list
-        stats_df[f'{self.y_col} mean'] = y_mean_list
-        stats_df[f'{self.x_col} stdev (sample)'] = x_std_list
-        stats_df[f'{self.x_col} mean'] = x_mean_list
-        stats_df = stats_df.reset_index(drop=True)
-        print(stats_df)
+        res_df.set_index(np.arange(1,len_runs+1,1), inplace=True)
+        res_df = res_df.rename_axis('Replicate')
 
-        stats_df.to_csv('Calibration_Stats.csv', index=False)
-        self.stats_df = stats_df
+        print(res_df)
+        res_df.to_csv('Calibration_Stats.csv')
 
+        fig, ax = plt.subplots()
 
-    def get_curve(self):
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-        x = self.stats_df[f'{self.x_col} mean'].to_numpy()
-        x_2d = x.reshape(-1, 1)
-
-        x_error = self.stats_df[f'{self.x_col} stdev (sample)'].to_numpy()
-
-        y = self.stats_df[f'{self.y_col} mean'].to_numpy()
-        y_2d = y.reshape(-1, 1)
-
-        y_error = self.stats_df[f'{self.y_col} stdev (sample)'].to_numpy()
+        x = conc_range_list[0]
+        y = res_df[mean_col]
+        yerror = res_df[std_col]
 
         model = LinearRegression()
-        model.fit(x_2d, y_2d)
+        model.fit(np.array(x).reshape(-1,1),y)
+        preds = model.predict(np.array(x).reshape(-1,1))
 
         m = model.coef_[0]
         c = model.intercept_
-        y_pred = model.predict(x_2d)
-        r2 = r2_score(y_2d, y_pred)
+        r2 = r2_score(y,preds)
 
-        ax.errorbar(x,y, xerr= x_error, yerr= y_error, marker='o',solid_capstyle='projecting', capsize=5,label='Data')
-
+        ax.errorbar(x,y,xerr=0,yerr=yerror, marker='o', label='Data',solid_capstyle='projecting', capsize=5)
         if c.item() < 0.001:
-            ax.plot(x,y_pred, color='r', ls='--',label=f'y = {m.item():.3f}x + {c.item():.3e}\nR² = {r2:.3f}')
+            ax.plot(x, preds, color='r', ls='--', label=f'y = {m.item():.3f}x + {c.item():.3e}\nR² = {r2:.3f}')
         else:
-            ax.plot(x, y_pred, color='r', ls='--', label=f'y = {m.item():.3f}x + {c.item():.3f}\nR² = {r2:.3f}')
+            ax.plot(x, preds, color='r', ls='--', label=f'y = {m.item():.3f}x + {c.item():.3f}\nR² = {r2:.3f}')
 
         ax.set_xlabel(self.x_col)
         ax.set_ylabel(self.y_col)
         ax.grid(alpha=0.5, linestyle=':')
         ax.legend()
+
         plt.show()
 
 
 t = Calibration('calibration_data.csv')
-t.get_curve()
-
+t = Calibration('replicate_data.csv')
