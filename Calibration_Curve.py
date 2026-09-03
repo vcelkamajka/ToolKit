@@ -55,7 +55,10 @@ class Calibration:
         res_df.set_index(np.arange(1,len_runs+1,1), inplace=True)
         res_df = res_df.rename_axis('Replicate')
 
+        print('='*80)
         print(res_df)
+        print('='*80)
+
         res_df.to_csv('Calibration_Stats.csv')
 
         fig, ax = plt.subplots()
@@ -85,6 +88,25 @@ class Calibration:
 
         plt.show()
 
+        self.model = model
+        self.m = m
+        self.c = c
+
+    def predict(self,y_to_predict):
+
+        res = self.model.predict(np.array(y_to_predict).reshape(-1,1))
+        print(f'Predicted {res[0]} for {self.x_col} = {y_to_predict}')
+
+    def reverse(self, y_to_reverse):
+
+        res = (y_to_reverse - self.c) / self.m
+        print(f'Predicted {res} for {self.y_col} = {y_to_reverse}')
+
 
 t = Calibration('calibration_data.csv')
+t.predict(1.4)
+t.reverse(1)
+
 t = Calibration('replicate_data.csv')
+t.predict(1.4)
+t.reverse(1)
