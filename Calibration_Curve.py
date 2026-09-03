@@ -8,10 +8,6 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = ["Times New Roman"]
 np.set_printoptions(legacy='1.25')
 
-def make_placeholder(n):
-    var = 'Run ' + str(n+1)
-    return var
-
 def get_std(x_run):
     std = np.std(x_run, ddof=1)
     return std
@@ -76,7 +72,7 @@ class Calibration:
         c = model.intercept_
         r2 = r2_score(y,preds)
 
-        ax.errorbar(x,y,xerr=0,yerr=yerror, marker='o', label='Data',solid_capstyle='projecting', capsize=5,ls='')
+        ax.errorbar(x,y,xerr=0,yerr=yerror, marker='o', ms=4, label='Data',solid_capstyle='projecting', capsize=5, ls='')
         if c.item() < 0.001:
             ax.plot(x, preds, color='r', ls='--', label=f'y = {m.item():.3f}x + {c.item():.3e}\nR² = {r2:.3f}')
         else:
