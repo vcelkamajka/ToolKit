@@ -76,7 +76,7 @@ class Calibration:
         c = model.intercept_
         r2 = r2_score(y,preds)
 
-        ax.errorbar(x,y,xerr=0,yerr=yerror, marker='o', label='Data',solid_capstyle='projecting', capsize=5)
+        ax.errorbar(x,y,xerr=0,yerr=yerror, marker='o', label='Data',solid_capstyle='projecting', capsize=5,ls='')
         if c.item() < 0.001:
             ax.plot(x, preds, color='r', ls='--', label=f'y = {m.item():.3f}x + {c.item():.3e}\nR² = {r2:.3f}')
         else:
