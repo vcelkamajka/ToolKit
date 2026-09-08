@@ -9,3 +9,5 @@ List of varied python programmes - used for menial / broad day-to-day work. In t
 **Calibration Curve:** Used for reading .csv files with columns: 0 = run I.D or number, 1 = x values and, 2 = y values. This returns the standard deviation of the sample, alongside the mean for each run also. Running .get_curve() produces a plot with (linear) line of best fit alongside the actual data with error bars.
 
 **Buffer Calculator:** Used to find the correct molar ratios of [A-] and [HA] with pKa to get the correct buffer pH. Can also calculate pH based on the Henderson-Hasselbalch equation.
+
+**Titration Curve:** Used to read a .csv file of volume and pH - this allows the user then to smooth the curve via a Savitzky-Golay filter or with a spline. This then generates a first and second derivative which finds the equivalent point(s).
