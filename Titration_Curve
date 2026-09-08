@@ -1,0 +1,160 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks, argrelmax, savgol_filter
+from sklearn.metrics import root_mean_squared_error
+from scipy import interpolate
+
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
+np.set_printoptions(legacy='1.25')
+
+
+class Titration:
+    def __init__(self, df):
+        self.df = pd.read_csv(df)
+        self.x_vals = self.df.iloc[:,0]
+        self.y_vals = self.df.iloc[:,1]
+        self.x_col = self.df.columns[0]
+        self.y_col = self.df.columns[1]
+
+    def smooth(self, method, order=None):
+
+        rmse_list = []
+        self.method = method
+
+        if method == 'Savgol':
+            # perform a quick optimisation:
+            for n in range(order+1, order+6):
+                y_smooth = savgol_filter(self.y_vals, n, order, mode = 'nearest')
+                rmse = root_mean_squared_error(self.y_vals, y_smooth)
+                rmse_list.append(rmse)
+
+            optimal_n_index = rmse_list.index(min(rmse_list))
+            optimal_n = optimal_n_index + order+1
+
+            y_smooth = savgol_filter(self.y_vals, optimal_n, order, mode='nearest')
+
+            plt.plot(self.x_vals, self.y_vals, label='Actual Data')
+            plt.plot(self.x_vals, y_smooth, label='Smoothed', ls='--')
+            plt.xlabel(self.x_col)
+            plt.ylabel(self.y_col)
+            plt.title(f'Smoothened Titration Data - Window = {optimal_n}')
+            plt.legend()
+            plt.show()
+
+            self.smooth = True
+            self.y_vals = y_smooth
+
+        if method == 'Spline':
+
+            for n in range(0,5):
+                y_smoothener = interpolate.make_smoothing_spline(self.x_vals, self.y_vals, lam=n)
+                rmse = root_mean_squared_error(self.y_vals, y_smoothener(self.x_vals))
+                rmse_list.append(rmse)
+
+            optimal_lam = rmse_list.index(min(rmse_list)) + 1
+
+            y_smoothener = interpolate.make_smoothing_spline(self.x_vals, self.y_vals, lam=optimal_lam)
+
+            smooth_x = np.linspace(min(self.x_vals), max(self.x_vals), len(self.x_vals)*2)
+            smooth_y = y_smoothener(smooth_x)
+
+            plt.plot(self.x_vals, self.y_vals, label='Actual Data')
+            plt.plot(smooth_x, smooth_y, label='Smoothed', ls='--')
+            plt.xlabel(self.x_col)
+            plt.ylabel(self.y_col)
+            plt.title(f'Smoothened Titration Data - Lam = {optimal_lam}')
+            plt.legend()
+            plt.show()
+
+            self.smooth = True
+            self.y_vals = smooth_y
+            self.x_vals = smooth_x
+
+            self.df = pd.DataFrame({self.x_col:self.x_vals, self.y_col:self.y_vals})
+
+
+    def plot(self):
+
+        fig, axs = plt.subplots(2,2, figsize=(12,8))
+
+        if hasattr(self, 'smooth'):
+            plt.suptitle(f'Smoothened Titration - {self.method}')
+            axs[0, 0].plot(self.x_vals, self.y_vals)
+        else:
+            plt.suptitle('Titration')
+            axs[0, 0].plot(self.x_vals, self.y_vals, marker='o', markersize=5)
+
+        axs[0, 0].set_title('Titration Curve')
+        axs[0, 0].set_xlabel(self.df.columns[0])
+        axs[0, 0].set_ylabel(self.df.columns[1])
+
+        # pka = to the pH equivalence point (sharp slope)
+        # first derivative (dy/dx = y, x = x)
+        # second derivative (dydy/dx = y, x = x)
+
+        # to determine pKa -> find half equivalence point ... half the V at equivalence point!
+        # should look at +- V/2 to find upper pKas if there are any..
+
+        self.dy = np.gradient(self.y_vals, self.x_vals)
+        self.dx = np.gradient(self.x_vals, self.x_vals)
+
+        self.dydy = np.gradient(self.dy, self.x_vals)
+
+        self.dydx = self.dy / self.dx
+        self.dydydx = self.dydy / self.dx
+
+        min_prominence = 0.25 * max(self.dydydx)
+
+        peak, props = find_peaks(self.dydx, plateau_size=1, width=2, prominence= min_prominence)
+        print('Detected equivalence points:')
+        print(self.df.iloc[peak].round(2).to_string(index=False))
+
+        print('Half-equivalence volumes:')
+
+        for n in self.df.iloc[peak].index:
+            point = self.df.iloc[peak][self.x_col][n]
+            half_point = point/2
+
+            low, high = [half_point, half_point + point]
+            print(round(low,2), round(high,2))
+
+
+        axs[0,1].plot(self.x_vals, self.dydx)
+        axs[0,1].scatter(self.df.iloc[peak][self.x_col].values, self.df.iloc[peak][self.y_col].values, color='r', marker='x',label='Local Max')
+
+        for n in range(len(peak)):
+            axs[0,1].axvline(self.df.iloc[peak][self.x_col].values[n], color='r', ls='--',alpha=0.5)
+
+        axs[0,1].set_title('First Derivative - Equivalence Points')
+        axs[0,1].set_ylim(0, max(self.dydx) * 1.2)
+        axs[0,1].set_ylabel(f'd{self.df.columns[1]}/dV')
+        axs[0,1].set_xlabel(self.df.columns[0])
+
+        axs[1, 0].plot(self.x_vals,self.dydydx)
+
+        for n in range(len(peak)):
+            axs[1, 0].axvline(self.df.iloc[peak][self.x_col].values[n], color='r', ls='--', alpha=0.5)
+
+        axs[1, 0].set_title('Second Derivative - Equivalence Points')
+        axs[1, 0].set_ylabel(f'd²{self.df.columns[1]}/dV²')
+        axs[1, 0].set_xlabel(self.df.columns[0])
+
+        axs[1, 1].plot(self.x_vals, self.y_vals)
+        axs[1, 1].set_title('Equivalence Points')
+        axs[1, 1].set_xlabel(self.df.columns[0])
+        axs[1, 1].set_ylabel(self.df.columns[1])
+
+        for n in range(len(peak)):
+            axs[1, 1].axvline(self.df.iloc[peak][self.x_col].values[n], color='r', ls='--',alpha=0.5)
+
+        plt.tight_layout()
+        plt.show()
+
+
+t = Titration('titration_triprotic_noisy.csv')
+t.smooth(method = 'Spline', order = 3)
+t.plot()
+
+
