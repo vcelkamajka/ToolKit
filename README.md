@@ -13,3 +13,5 @@ List of varied python programmes - used for menial / broad day-to-day work. In t
 ⭐ **Titration Curve:** Used to read a .csv file of volume and pH - this allows the user then to smooth the curve via a Savitzky-Golay filter or with a spline. This then generates a first and second derivative which finds the equivalent point(s). If pKa values are known, an ideal species plot can also be made.
 
 **MiniPy:** Used to perform various statistical tests (t-test, anova, post-hoc...). Can also generate distribution plots, box-plots, normality tests, etc.,
+
+⭐ **PhD File Sorter:** Used to a) rename any files using metadata (if PDF) and also, b) redirect downloads to a different folder for sorting.
