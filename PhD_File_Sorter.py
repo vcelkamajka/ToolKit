@@ -1,6 +1,7 @@
 import os
 import shutil
 import PyPDF2
+import time
 
 # CHANGE DIRECTORIES BELOW TO YOUR LIKING - THIS WILL NOT WORK OUT OF THE BOX! ---------------------
 
@@ -8,7 +9,7 @@ import PyPDF2
 # LEAVING IT AS 'FASLE', IT'LL SEND THE FILE WITH THE ORIGINAL DOWNLOAD NAME
 
 # THIS PROGRAMME NEEDS TO BE RUN PERIODICALLY AS IT'LL NOT WORK IN THE BACKGROUND
-# IF YOU WANT CONSTANT MONITORING - CONSIDER ADDING A WHILE LOOP AND TIME.SLEEP
+# IF YOU WANT CONSTANT MONITORING - UNHASH THE BOTTOM PIECE, YOU CAN ALTER THE FREQUENCY IN THE 'TIME.SLEEP( time (s) )' NOTE: MAY SLOW DOWN COMPUTER!
 
 pdf_folder = 'C:/Users/USER/PycharmProjects/PythonProject/PDF_Tool/PDF Downloads' 
 # THE FOLDER WHERE PDFS GET DOWNLOADED - THIS CAN BE UPDATED IN GOOGLE SETTINGS
@@ -66,3 +67,8 @@ suffix = ('.pdf', '.doc', '.docx', '.txt')
 
 
 clean = clean_folder(manual_mode=False)
+
+# while True:
+#     time.sleep(10)
+#     clean = clean_folder(manual_mode=False)
+#     print('Cleaned folder...')
