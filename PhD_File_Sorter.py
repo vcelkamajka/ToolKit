@@ -33,12 +33,15 @@ suffix = ('.pdf', '.doc', '.docx', '.txt')
 
                     reader = PyPDF2.PdfReader(pdf_file)
 
-                    metadata = reader.metadata
-                    print('-'*100)
-                    print(f"Author: {metadata.author}")
-                    print(f"Title: {metadata.title}")
-                    print(f"Creation Date: {metadata.creation_date}")
-                    print('-' * 100)
+                   metadata = reader.metadata
+                    try:
+                        print('-'*100)
+                        print(f"Author: {metadata.author}")
+                        print(f"Title: {metadata.title}")
+                        print(f"Creation Date: {metadata.creation_date}")
+                        print('-' * 100)
+                    except:
+                        pass
 
                 try:
                     new_name = pdf_folder + '/' + metadata.title + '.pdf'
