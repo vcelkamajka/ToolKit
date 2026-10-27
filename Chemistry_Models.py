@@ -21,8 +21,8 @@ def Korsmeyer_Peppas(t, k,n):
 def Higuchi(t,k):
     return k * np.sqrt(t)
 
-def Hixson_Crowell(t,k,init_amount):
-    return -k * t + (init_amount) ** 1/3
+def Hixson_Crowell(t,k):
+    return -( (100)**(1/3) - k * t)**3 + 100
 
 def Gompertz(t,max,a,k):
     return max * np.exp(-a*np.exp(-t*k))
