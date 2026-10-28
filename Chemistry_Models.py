@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy import stats
 from sklearn.metrics import r2_score, mean_absolute_percentage_error, mean_squared_error
+import inspect
 
 # to determine the order of a reaction
 
@@ -46,6 +47,10 @@ class ReleaseModel:
         print(self.df)
         print('='*50)
 
+        print(f'Min Release: {min(self.y_vals)}\nMax Release: {max(self.y_vals)}\nRelease Time: {min(self.x_vals)} - {max(self.x_vals)}\nTest Points: {len(self.x_vals)}')
+
+        print('='*50)
+
         results_df = pd.DataFrame()
         r2_list = []
         MAPE_list = []
@@ -64,6 +69,13 @@ class ReleaseModel:
             mse = mean_squared_error(fitted_y, self.y_vals)
             mape = mean_absolute_percentage_error(self.y_vals, fitted_y)
 
+            sig_list = []
+            signature = inspect.signature(function)
+            for sig in signature.parameters:
+                sig_list.append(sig)
+
+            sig_list.pop(0)
+
             print(f'R² score: {r2:.2f}')
             print(f'MSE score: {mse:.2f}')
             print(f'MAPE score: {mape:.2f}%')
@@ -74,12 +86,14 @@ class ReleaseModel:
             MAPE_list.append(mape)
             aic_list.append(aic)
 
-            print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
-            print('High condition numbers indicate over parametrising, reduce the number terms.')
+            #print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
+            #print('High condition numbers indicate over parametrising, reduce the number terms.')
 
+            sig_count = 0
             for paramater in param:
-                print(f'Paramater: {paramater:.3f}')
-            print(param_cov)
+                print(f'{sig_list[sig_count]}: {paramater:.3f}')
+                sig_count += 1
+            #print(param_cov)
             print('='*50)
 
 
@@ -105,6 +119,35 @@ class ReleaseModel:
         results_df = results_df.round(2)
         print(results_df)
         results_df.to_csv('Diffusion_Model_Results.csv')
+
+        # all models overlayed
+
+        best_model_idx = np.argmin(aic_list)
+        best_model = function_names[best_model_idx]
+
+        count = 0
+        fig, ax = plt.subplots(figsize=(8,5))
+        for functions in function_list:
+            function = functions
+
+            param, param_cov = curve_fit(function, self.x_vals, self.y_vals)
+            fitted_y = function(self.x_vals, *param)
+
+            if best_model == function_names[count]:
+                if function == Korsmeyer_Peppas:
+                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]}',alpha = 1, lw=2)
+                else:
+                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]} - Best fit',alpha = 1, lw=2)
+            else:
+                plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]}',alpha = 0.5)
+
+            plt.legend()
+            plt.xlabel(self.df.columns[0])
+            plt.ylabel(self.df.columns[1])
+            plt.title('All Models')
+            count += 1
+        plt.scatter(self.x_vals, self.y_vals, label=f'Actual Data')
+        plt.show()
 
 
 test = ReleaseModel('drug_release.csv')
@@ -140,6 +183,13 @@ class SurfaceModel:
             function = functions
             print(f'MODEL = {surface_function_names[count]}')
 
+            sig_list = []
+            signature = inspect.signature(function)
+            for sig in signature.parameters:
+                sig_list.append(sig)
+
+            sig_list.pop(0)
+
             if function == Langmuir:
                 param, param_cov = curve_fit(function, self.x_vals, self.y_vals,bounds=([0,0],[np.inf,np.inf]))
             else:
@@ -163,12 +213,14 @@ class SurfaceModel:
             MAPE_list.append(mape)
             aic_list.append(aic)
 
-            print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
-            print('High condition numbers indicate over parametrising, reduce the number terms.')
+            #print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
+            #print('High condition numbers indicate over parametrising, reduce the number terms.')
 
+            sig_count = 0
             for paramater in param:
-                print(f'Paramater: {paramater:.3f}')
-            print(param_cov)
+                print(f'{sig_list[sig_count]}: {paramater:.3f}')
+                sig_count += 1
+            #print(param_cov)
             print('=' * 50)
 
             plt.scatter(self.x_vals, self.y_vals, label=f'Actual Data')
@@ -190,6 +242,7 @@ class SurfaceModel:
         results_df = results_df.round(2)
         print(results_df)
         results_df.to_csv('Surface_Model_Results.csv')
+        print('=' * 50)
 
 test = SurfaceModel('surface_chemistry_isotherms.csv')
 
@@ -241,8 +294,8 @@ class ArrheniusEquation:
         MAPE_list.append(mape)
         mse_list.append(mse)
 
-        print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
-        print('High condition numbers indicate over parametrising, reduce the number terms.')
+        #print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
+        #print('High condition numbers indicate over parametrising, reduce the number terms.')
 
         for paramater in param:
             print(f'Paramater: {paramater:.3f}')
