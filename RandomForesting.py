@@ -11,6 +11,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import shap
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier,plot_tree, export_text
+
 
 class RF:
     def __init__(self, method, file, cols_to_drop = None, shap = False):
@@ -95,6 +97,19 @@ class RF:
 
         self.y_pred = grid.predict(self.x_test)
 
+        model = grid.best_estimator_.named_steps[type]
+        pre = grid.best_estimator_.named_steps['preprocess']
+        names = [n.split('__')[-1] for n in pre.get_feature_names_out()]
+        X_t = pre.transform(self.x_train)
+        forest_pred = model.predict(X_t)
+
+        Surrogate = DecisionTreeRegressor if self.method == RandomForestRegressor else DecisionTreeClassifier
+        surrogate = Surrogate(max_depth=3, random_state=42).fit(X_t, forest_pred)
+
+        fig, ax = plt.subplots(figsize=(18, 8))
+        plot_tree(surrogate, feature_names=names, filled=True, rounded=True, fontsize=9, ax=ax)
+        plt.show()
+
 
         if type == 'classifier':
             cm = confusion_matrix(self.y_test, self.y_pred)
@@ -170,6 +185,7 @@ class RF:
             print(f'ROC AUC: {score:.3f}')
 
             print('=' * 80)
+
 
         if type == 'regressor':
             best_pipe = grid.best_estimator_
