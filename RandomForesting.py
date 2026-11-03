@@ -97,7 +97,6 @@ class RF:
 
 
         if type == 'classifier':
-
             cm = confusion_matrix(self.y_test, self.y_pred)
 
             sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
@@ -112,10 +111,14 @@ class RF:
             if self.method == RandomForestClassifier:
                 clf = grid.best_estimator_.named_steps['classifier']
 
-            feature_names = self.x_train.columns
+            best = grid.best_estimator_
+            feature_names = best[:-1].get_feature_names_out()
+            model = best[-1]
 
-            feature_df = pd.DataFrame({'Feature': feature_names, 'Importance': clf.feature_importances_})
-            feature_df.sort_values(by='Importance', ascending=False, inplace=True)
+            feature_df = pd.DataFrame({
+                'Feature': feature_names,
+                'Importance': model.feature_importances_
+            }).sort_values(by='Importance', ascending=False)
 
             print(feature_df)
             print('=' * 80)
@@ -158,8 +161,13 @@ class RF:
             print(classification_report(self.y_test, self.y_pred))
 
             proba = grid.predict_proba(self.x_test)
-            score = roc_auc_score(self.y_test, proba, multi_class="ovr")
-            print(f'ROC AUC (ovr):     {score:.3f}')
+
+            if proba.shape[1] == 2:  # binary
+                score = roc_auc_score(self.y_test, proba[:, 1])
+            else:  # multiclass
+                score = roc_auc_score(self.y_test, proba, multi_class="ovr")
+
+            print(f'ROC AUC: {score:.3f}')
 
             print('=' * 80)
 
@@ -168,8 +176,14 @@ class RF:
             reg = best_pipe.named_steps['regressor']
             feature_names = best_pipe.named_steps['preprocess'].get_feature_names_out()
 
-            feature_df = pd.DataFrame({'Feature': feature_names, 'Importance': reg.feature_importances_})
-            feature_df.sort_values(by='Importance', ascending=False, inplace=True)
+            best = grid.best_estimator_
+            feature_names = best[:-1].get_feature_names_out()
+            model = best[-1]
+
+            feature_df = pd.DataFrame({
+                'Feature': feature_names,
+                'Importance': model.feature_importances_
+            }).sort_values(by='Importance', ascending=False)
 
             print(feature_df)
             print('=' * 80)
@@ -236,7 +250,8 @@ class RF:
             plt.show()
 
 
-test = RF('regressor','chem_solubility_dataset.csv', ['compound_id', 'solubility_class'])
+#test = RF('regressor','chem_solubility_dataset.csv', ['compound_id', 'solubility_class'])
+#test = RF('classifier','chem_solubility_dataset.csv', ['compound_id', 'logS'])
 
-test = RF('classifier','chem_solubility_dataset.csv', ['compound_id', 'logS'])
-
+test = RF('regressor','chem_reaction_yield_dataset.csv', ['reaction_id', 'successful'])
+test = RF('classifier','chem_reaction_yield_dataset.csv', ['reaction_id', 'yield_percent'])
