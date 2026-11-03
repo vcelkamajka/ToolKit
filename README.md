@@ -15,3 +15,5 @@ List of varied python programmes - used for menial / broad day-to-day work. In t
 **MiniPy:** Used to perform various statistical tests (t-test, anova, post-hoc...). Can also generate distribution plots, box-plots, normality tests, etc.,
 
 ⭐ **PhD File Sorter:** Used to a) rename any files using metadata (if PDF) and also, b) redirect downloads to a different folder for sorting.
+
+⭐ **RandomForeseting:** Can run regression or classification Random Forest machine learning. Input your specified model type ('regression' or 'classification'), your .csv file, include any column names you wish to remove.
