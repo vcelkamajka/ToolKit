@@ -1,6 +1,6 @@
 import os
 import shutil
-import PyPDF2
+import pypdf
 import time
 
 # CHANGE DIRECTORIES BELOW TO YOUR LIKING - THIS WILL NOT WORK OUT OF THE BOX! ---------------------
@@ -31,20 +31,20 @@ suffix = ('.pdf', '.doc', '.docx', '.txt')
                 with open(pdf_folder + '/' + file, 'rb') as pdf_file:
                     name = pdf_folder + '/' + file
 
-                    reader = PyPDF2.PdfReader(pdf_file)
+                    reader = pypdf.PdfReader(pdf_file)
 
                    metadata = reader.metadata
                     try:
                         print('-'*100)
                         print(f"Author: {metadata.author}")
                         print(f"Title: {metadata.title}")
-                        print(f"Creation Date: {metadata.creation_date}")
+                        print(f"Creation Date: {metadata.creation_date.year}")
                         print('-' * 100)
                     except:
                         pass
 
                 try:
-                    new_name = pdf_folder + '/' + metadata.title + '.pdf'
+                    new_name = pdf_folder + '/' + str(year) + ' ' + metadata.title + '.pdf'
                     os.rename(name, new_name)
                     move = shutil.move(new_name, unsorted_pdf_loc)
                 except Exception as e:
