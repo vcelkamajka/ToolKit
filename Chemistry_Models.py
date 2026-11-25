@@ -5,6 +5,9 @@ from scipy.optimize import curve_fit
 from scipy import stats
 from sklearn.metrics import r2_score, mean_absolute_percentage_error, mean_squared_error
 import inspect
+import sympy as sp
+from scipy.integrate import solve_ivp
+from ExcelMaker import *
 
 # to determine the order of a reaction
 
@@ -12,8 +15,23 @@ def AIC(n,k, y_pred, y_data):
     sse = np.sum((y_pred - y_data)**2)
     return n * np.log(sse/n) + 2*k
 
+def AICc(k, y_pred, y_data):
+    sse = np.sum((y_pred - y_data) ** 2)
+    n = len(y_data)
+    aic = n * np.log(sse/n) + 2*k
+    return aic + (2 * k * (k + 1)) / (n - k - 1) if n > k + 1 else np.nan
+
+def adj_r2(k, y_pred, y_data):
+    sse = np.sum((y_pred - y_data) ** 2)
+    n = len(y_data)
+    sst = np.sum((y_data - y_data.mean()) ** 2)
+    r2 = 1 - sse / sst
+    return 1 - (1 - r2) * (n - 1) / (n - k - 1) if n > k + 1 else np.nan
+
+
 
 def Korsmeyer_Peppas(t, k,n):
+    # valid for <60% release
     # n ≤ 0.45 to 0.5: Fickian diffusion (the drug simply moves out through pores or the matrix by normal molecular diffusion)
     # 0.45 < n < 0.89 (or 0.5 < n < 1.0): Anomalous (non-Fickian) transport (both diffusion and the relaxing/swelling of the polymer control the release).
     # n = 0.89 to 1.0 (Case-II transport): Erosion or relaxation-controlled release (polymer swelling or chain relaxation drives the release).
@@ -25,8 +43,8 @@ def Higuchi(t,k):
 def Hixson_Crowell(t,k):
     return -( (100)**(1/3) - k * t)**3 + 100
 
-def Gompertz(t,max,a,k):
-    return max * np.exp(-a*np.exp(-t*k))
+def Gompertz(t, ymax, a, k):
+    return ymax * np.exp(-a * np.exp(-k * np.log(t)))
 
 def zero_order(t,k):
     return k * t
@@ -38,13 +56,26 @@ def first_order(t,k):
 function_list = [zero_order, first_order, Korsmeyer_Peppas, Higuchi, Hixson_Crowell,Gompertz]
 function_names = ['Zero Order Model', 'First Order Model', 'Korsmeyer-Peppas Model', 'Higuchi Model', 'Hixson-Crowell Model','Gompertz Model']
 
+
 class ReleaseModel:
-    def __init__(self,filename,df=None,x_vals=None,y_vals=None):
+    def __init__(self,filename, df=None,x_vals=None,y_vals=None, korsen_ys = None,transform = None):
+        # transform = [method, amount loaded]
         self.df = pd.read_csv(filename)
         self.x_vals = self.df.iloc[:,0]
         self.y_vals = self.df.iloc[:,1]
 
+        print('=' * 50)
+
+        if transform[0] == 'load_to_pct':
+            self.df[self.df.columns[1]] = self.df[self.df.columns[1]].apply(lambda x: 100 - (transform[1] - x)/transform[1]*100)
+            self.y_vals = self.df.iloc[:,1]
         print(self.df)
+
+
+        if max(self.y_vals) > 60:
+            self.korsen_df = self.df[self.df[self.df.columns[1]] < 60]
+
+
         print('='*50)
 
         print(f'Min Release: {min(self.y_vals)}\nMax Release: {max(self.y_vals)}\nRelease Time: {min(self.x_vals)} - {max(self.x_vals)}\nTest Points: {len(self.x_vals)}')
@@ -53,19 +84,36 @@ class ReleaseModel:
 
         results_df = pd.DataFrame()
         r2_list = []
+        r2_adj_list = []
         MAPE_list = []
         aic_list = []
+        aicc_list = []
 
         count = 0
         for functions in function_list:
             function = functions
-            print(f'MODEL = {function_names[count]}')
+            print(f'MODEL = {function_names[count]}')#
 
-            param, param_cov = curve_fit(function, self.x_vals, self.y_vals)
+            if function == Korsmeyer_Peppas:
+                self.x_vals = self.korsen_df.iloc[:,0]
+                self.y_vals = self.korsen_df.iloc[:,1]
+            else:
+                self.x_vals = self.df.iloc[:, 0]
+                self.y_vals = self.df.iloc[:, 1]
+
+            if function != Gompertz:
+                param, param_cov = curve_fit(function, self.x_vals, self.y_vals, maxfev = 10000)
+            else:
+                param, param_cov = curve_fit(function, self.x_vals[self.x_vals > 0], self.y_vals[self.x_vals > 0], p0=[100, 1, 0.5],
+                 bounds=([0, 0, 0], [100, 50, 10]), maxfev=50000)
+
             fitted_y = function(self.x_vals, *param)
 
+
             aic = AIC(len(self.x_vals), len(param) + 1, fitted_y, self.y_vals)
+            aicc = AICc( len(param) + 1, fitted_y, self.y_vals)
             r2 = r2_score(self.y_vals, fitted_y)
+            r2_adj = adj_r2(len(param) + 1, fitted_y, self.y_vals)
             mse = mean_squared_error(fitted_y, self.y_vals)
             mape = mean_absolute_percentage_error(self.y_vals, fitted_y)
 
@@ -77,14 +125,18 @@ class ReleaseModel:
             sig_list.pop(0)
 
             print(f'R² score: {r2:.2f}')
+            print(f'R² adj. score: {r2_adj:.2f}')
             print(f'MSE score: {mse:.2f}')
             print(f'MAPE score: {mape:.2f}%')
             print(f'AIC score: {aic:.2f}')
+            print(f'AICc score: {aicc:.2f}')
             print('=' * 50)
 
             r2_list.append(r2)
+            r2_adj_list.append(r2_adj)
             MAPE_list.append(mape)
             aic_list.append(aic)
+            aicc_list.append(aicc)
 
             #print(f'Condition number of covariance matrix: {np.linalg.cond(param_cov):.2f}')
             #print('High condition numbers indicate over parametrising, reduce the number terms.')
@@ -93,6 +145,15 @@ class ReleaseModel:
             for paramater in param:
                 print(f'{sig_list[sig_count]}: {paramater:.3f}')
                 sig_count += 1
+
+            if function == Korsmeyer_Peppas:
+                if param[1] <= 0.5:
+                    print('Fickian diffusion (the drug simply moves out through pores or the matrix by normal molecular diffusion)')
+                if 0.5 < param[1] <= 0.89:
+                    print("Anomalous (non-Fickian) transport (both diffusion and the relaxing/swelling of the polymer control the release)")
+                if param[1] > 0.89:
+                    print('Erosion or relaxation-controlled release (polymer swelling or chain relaxation drives the release)')
+
             #print(param_cov)
             print('='*50)
 
@@ -100,6 +161,7 @@ class ReleaseModel:
             plt.scatter(self.x_vals,self.y_vals,label=f'Actual Data')
             if function == Korsmeyer_Peppas:
                 plt.plot(self.x_vals,fitted_y,label=f'Fitted Data: R² = {r2:.2f}\nn = {param[1]:.2f}',marker='x',color='#FF7A04')
+                plt.scatter(self.df.iloc[:, 0], self.df.iloc[:, 1], color='#1F77B4')
             else:
                 plt.plot(self.x_vals, fitted_y, label=f'Fitted Data: R² = {r2:.2f}', marker='x',color='#FF7A04')
             plt.legend()
@@ -111,14 +173,17 @@ class ReleaseModel:
 
         results_df['Model'] = function_names
         results_df['R²'] = r2_list
+        results_df['R² adj.'] = r2_adj_list
         results_df['MAPE'] = MAPE_list
         results_df['AIC'] = aic_list
+        results_df['AICc'] = aicc_list
 
         results_df.sort_values(by=['R²'],ascending=False,inplace=True)
 
         results_df = results_df.round(2)
         print(results_df)
         results_df.to_csv('Diffusion_Model_Results.csv')
+        print('='*50)
 
         # all models overlayed
 
@@ -130,14 +195,19 @@ class ReleaseModel:
         for functions in function_list:
             function = functions
 
-            param, param_cov = curve_fit(function, self.x_vals, self.y_vals)
+            if function != Gompertz:
+                param, param_cov = curve_fit(function, self.x_vals, self.y_vals, maxfev = 10000)
+            else:
+                param, param_cov = curve_fit(function, self.x_vals[self.x_vals > 0], self.y_vals[self.x_vals > 0], p0=[100, 1, 0.5],
+                 bounds=([0, 0, 0], [100, 50, 10]), maxfev=50000)
+                
             fitted_y = function(self.x_vals, *param)
 
             if best_model == function_names[count]:
                 if function == Korsmeyer_Peppas:
-                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]}',alpha = 1, lw=2)
+                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]}',alpha = 1, lw=4)
                 else:
-                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]} - Best fit',alpha = 1, lw=2)
+                    plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]} - Best fit',alpha = 1, lw=4)
             else:
                 plt.plot(self.x_vals, fitted_y, label=f'{function_names[count]}',alpha = 0.5)
 
@@ -149,8 +219,10 @@ class ReleaseModel:
         plt.scatter(self.x_vals, self.y_vals, label=f'Actual Data')
         plt.show()
 
+        excel = ExcelReport(df = results_df, name= 'Release_Results', file = None)
 
-test = ReleaseModel('drug_release.csv')
+
+test = ReleaseModel('drug_release.csv', transform = ['load_to_pct', 2000])
 
 
 
